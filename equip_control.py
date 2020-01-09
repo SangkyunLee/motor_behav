@@ -13,8 +13,8 @@ import json
 from os import path
 #from datetime import date, datetime
 #from Daq import *
-#from mcc_daq import *
-#from mcc_dio import *
+from mcc_daq import *
+from mcc_dio import *
 #from Ext_trigger import *
 #from Timer import Timer
 import Stepper_control as stepper
@@ -178,6 +178,7 @@ class Controlframe:
         self.hwin.pack()
         self.data =[]
         self.stepper =None
+        self.dio = None
         
     def on_closing(self):
         if self.stepper:
@@ -208,12 +209,15 @@ class Controlframe:
         
         
         
-        motor_set={'current':'1mA', 'dur':0}
-        h= Entryframe(self.hwin,motor_set,'motor_setting')
+        DIO_set={'Ch.':6, 'dur':0,'delay':0}
+        h= Entryframe(self.hwin,DIO_set,'DIO_setting')
         h.grid(row=3,columnspan=2, sticky=tk.W, padx=5, pady=5)
         self.hcomp['elec']=h
         
-        h = tk.Button(self.hwin, text='elec_stim', command=self.elec_stim).grid(row=4, column=0, sticky=tk.W, pady=4)
+        h = tk.Button(self.hwin, text='DIO_init', command=self.DIO_init).grid(row=3, column=1, sticky=tk.W, pady=4)
+        self.hcomp['DIO_init']=h
+        
+        h = tk.Button(self.hwin, text='elec_stim', command=self.DIO_output).grid(row=4, column=0, sticky=tk.W, pady=4)
         self.hcomp['elec_stim']=h
         
    
@@ -251,8 +255,34 @@ class Controlframe:
             self.stepper.setVelocityLimit(0)
             self.hcomp['motor_setting'].entry_enable()
     
-    def elec_stim(self):
-        pass
+    def DIO_init(self):
+        if not self.dio:
+            dioparam = self.paramframe.data['dioparam']
+            self.dio = MCC152_DIO(dioparam)
+        else:
+            self.dio.init_dev()        
+        
+            
+            
+    
+    def DIO_output(self):
+        channels = self.paramframe.data['dioparam']['do_ch'] 
+        ch = self.hcomp['elec'].hcomp['Ch.'].get()
+        ch = int(ch)
+        print(type(ch))
+        #ch = int(ch)
+        #tk.messagebox.showinfo("Info",type(ch))
+        dur_sec = float(self.hcomp['elec'].hcomp['dur'].get())
+        delay = float(self.hcomp['elec'].hcomp['delay'].get())
+        if ch in channels  and self.dio:        
+            sleep(delay)            
+            self.dio.write_outputvalue(ch, 1)            
+            sleep(dur_sec)
+            self.dio.write_outputvalue(ch, 0)
+        else:
+            msg = "ch"+str(ch)+" not opened or device not attached"
+            tk.messagebox.showinfo("Info",msg)
+            
 
         
 hf = Controlframe('Sang.json')

@@ -15,10 +15,5 @@
         "mode": "continuous",
         "timeout": 5,
         "acq_dur": 0.2
-    },    
-    "elecparam": {
-        "delaytime": 1,
-        "elecstim_trigger_ch": 7,
-        "pulsedur": 0.5
     }
 }
