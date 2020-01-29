@@ -9,7 +9,7 @@ from daqhats_utils import select_hat_device
 from daqhats import mcc152, HatIDs, HatError, DIOConfigItem, \
     interrupt_callback_enable, HatCallback, interrupt_callback_disable
 
-
+from time import sleep
 from Timer import Timer
 from Threadworker import *
 import logging
@@ -217,6 +217,34 @@ class MCC152_DIO:
             logging.error('DO channel is empty.', exc_info=True)
         
         return outputvalue, timestamp
+    
+    def write_pulses(self, ch, dur,nrep,single_stim_dur=0.01):
+        """
+        def write_pulses(self, ch, dur, nrep, single_stim_dur=0.01)
+        writing square pulses
+        """
+        from time import time
+        import numpy as np
+        if bool(self.do_ch):
+            steptime = dur/nrep
+            single_stim_dur = min(steptime*0.5, single_stim_dur)
+            
+            stim_onsets = np.linspace(0,dur,nrep)
+            
+            try:
+                t0 = time() # get starting time
+                for itime in stim_onsets:
+                    self.HAT.dio_output_write_bit(ch,1)
+                    sleep(single_stim_dur)
+                    self.HAT.dio_output_write_bit(ch,0)
+                    while time()-t0<itime:
+                        sleep(0.01)
+            except (HatError, ValueError):
+                raise
+        else:
+            logging.warning('DO channel is empty.')
+            
+    
         
                 
                 

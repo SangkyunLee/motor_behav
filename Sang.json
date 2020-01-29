@@ -11,9 +11,10 @@
             0,
             1
         ],
-        "scan_rate": 5000,
+        "scan_rate": 20000,
         "mode": "continuous",
         "timeout": 5,
-        "acq_dur": 0.2
+        "acq_dur": 0.2,
+        "save_dir":"../motor_data"
     }
 }
