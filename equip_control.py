@@ -230,6 +230,7 @@ class Controlframe:
         with open(outpar_fn,'wt') as envf:
             j=json.dumps(outpar, indent=4)
             envf.write(j)
+            tk.messagebox.showinfo("SAVE","Trialdata_saved in:{}".format(outpar_fn))
             
         
     def create_uimodules(self):
@@ -292,6 +293,7 @@ class Controlframe:
             self.daq = None            
         self.daq = MCC118(self.paramframe.data['daqparam'])        
         self.daq.acq_start()
+        tk.messagebox.showinfo("DAQ-Info","DAQ_started. filename:{}".format(self.daq.fn))
         h= self.hcomp['daqstart_b']        
         h['state'] = tk.DISABLED
         
