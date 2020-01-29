@@ -197,8 +197,7 @@ class Controlframe:
             self.stepper.close()
         if self.daq:
             self.daqstop()    
-        self.master.destroy()
-        self.save_trialdata()
+        self.master.destroy()        
         
         print("Window closed")
     
@@ -283,6 +282,10 @@ class Controlframe:
         h.grid(row=6, column=1, pady=4)
         self.hcomp['elec_stim']=h
         
+        h = tk.Button(self.hwin, text='save_trialdata', command=self.save_trialdata)
+        h.grid(row=7, column=0, pady=4)
+        self.hcomp['save_trialdata']=h
+        
         
     def daqstart(self):
         if self.daq:
@@ -295,7 +298,8 @@ class Controlframe:
         
     def daqstop(self):  
         if self.daq:      
-            self.daq.acq_stop()                     
+            self.daq.acq_stop()     
+        
         h=self.hcomp['daqstart_b']
         h['state'] = tk.NORMAL
 
@@ -304,12 +308,16 @@ class Controlframe:
     def motor_init(self):   
         if not self.stepper:        
             self.stepper = stepper.Stepperwrapper()
+            h= self.hcomp['motor_init']        
+            h['state'] = tk.DISABLED
             
     def motor_detach(self):
         if self.stepper:
             self.stepper.close()
             self.stepper = None
             tk.messagebox.showinfo("Info","motor detached")
+            h= self.hcomp['motor_init']
+            h['state'] = tk.NORMAL
         
     def motor_run(self):
         if self.stepper:
@@ -323,7 +331,7 @@ class Controlframe:
             self.stepper.setVelocityLimit(float(speed))    
             # record trial info
             self.motor_time.append(self.daq.timer.elapsed_time()) 
-            self.motor_speed.append(speed)       
+            self.motor_speed.append(float(speed))       
             self.stepper.setEngaged(True) 
             self.hcomp['motor_setting'].entry_disable()
         else:
