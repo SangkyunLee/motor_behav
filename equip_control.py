@@ -16,7 +16,7 @@ from os import path
 from mcc_daq import *
 from mcc_dio import *
 #from Ext_trigger import *
-#from Timer import Timer
+from Timer import Timer
 import Stepper_control as stepper
 
 
@@ -185,12 +185,14 @@ class Controlframe:
         
         self.stepper =None
         self.dio = None       
-        self.daq = None
+        self.daq = None        
         
         self.motor_time =[]  # motor start and stop time      
         self.motor_speed=[]  # motor speed
         self.elec_time=[]   # record for elecstim onset time and duration
         
+        self.timer = Timer() # set timer
+        self.motor_timer = None
         
     def on_closing(self):
         if self.stepper:
@@ -212,7 +214,9 @@ class Controlframe:
             'elec_time':self.elec_time}
         outpar = self.paramframe.data
         outpar.update({'trial_data':output_tr})
-        if self.daq.fn:
+        if outpar['daqparam']['timer']:
+            outpar['daqparam']['timer']=[]
+        if self.daq and self.daq.fn:
             fn = self.daq.fn
             idx = fn.find('.dat')
             outpar_fn = fn[:idx]+'.json'            
@@ -252,46 +256,48 @@ class Controlframe:
         self.hcomp['motor_detach']=h
         
         
-        motor_set={'speed':50,'accel':250}
+        motor_set={'speed':50,'accel':250, 'dur':30}
         h= Entryframe(self.hwin,motor_set,'motor_setting')
-        h.grid(row=2,rowspan=2,column=0, columnspan=2, padx=5, pady=5)
+        h.grid(row=2,rowspan=3,column=0, columnspan=2, padx=5, pady=5)
         self.hcomp['motor_setting']=h
         
         
         
         
         h = tk.Button(self.hwin, text='motor_run', command=self.motor_run)
-        h.grid(row=4, column=0,  pady=4)
+        h.grid(row=5, column=0,  pady=4)
         self.hcomp['motor_run']=h
         
         h = tk.Button(self.hwin, text='motor_stop', command=self.motor_stop)
-        h.grid(row=4, column=1, pady=4)
+        h.grid(row=5, column=1, pady=4)
         self.hcomp['motor_stop']=h
         
         
         
         DIO_set={'Ch.':6, 'dur':0,'delay':0, 'motor_delay':0}
         h= Entryframe(self.hwin,DIO_set,'DIO_setting')
-        h.grid(row=5,columnspan=2, padx=2, pady=5)
+        h.grid(row=6,columnspan=2, padx=2, pady=5)
         self.hcomp['elec']=h
         
         h = tk.Button(self.hwin, text='DIO_init', command=self.DIO_init)
-        h.grid(row=6, column=0, pady=4)
+        h.grid(row=7, column=0, pady=4)
         self.hcomp['DIO_init']=h
         
         h = tk.Button(self.hwin, text='elec_stim', command=self.DIO_output)
-        h.grid(row=6, column=1, pady=4)
+        h.grid(row=7, column=1, pady=4)
         self.hcomp['elec_stim']=h
         
         h = tk.Button(self.hwin, text='save_trialdata', command=self.save_trialdata)
-        h.grid(row=7, column=0, pady=4)
+        h.grid(row=8, column=0, pady=4)
         self.hcomp['save_trialdata']=h
         
         
     def daqstart(self):
         if self.daq:
-            self.daq = None            
-        self.daq = MCC118(self.paramframe.data['daqparam'])        
+            self.daq = None         
+        daqparam = self.paramframe.data['daqparam']
+        daqparam['timer']=self.timer
+        self.daq = MCC118(daqparam)        
         self.daq.acq_start()
         tk.messagebox.showinfo("DAQ-Info","DAQ_started. filename:{}".format(self.daq.fn))
         h= self.hcomp['daqstart_b']        
@@ -327,27 +333,54 @@ class Controlframe:
             #tk.messagebox.showinfo("test",str(hf.hcomp['motor_setting'].data['speed']))
             speed = self.hcomp['motor_setting'].hcomp['speed'].get()
             accel = self.hcomp['motor_setting'].hcomp['accel'].get()
+            dur = self.hcomp['motor_setting'].hcomp['dur'].get()
+            dur = float(dur)
 
             self.stepper.setEngaged(False)             
             self.stepper.setAcceleration(float(accel))
             self.stepper.setVelocityLimit(float(speed))    
             # record trial info
-            self.motor_time.append(self.daq.timer.elapsed_time()) 
+            motor_start_time=self.timer.elapsed_time()            
+            self.motor_time.append(motor_start_time) 
             self.motor_speed.append(float(speed))       
-            self.stepper.setEngaged(True) 
+            self.stepper.setEngaged(True)             
             self.hcomp['motor_setting'].entry_disable()
+            if dur>0:                
+                self.motor_timer =Threadworker(self.motor_stop_timer)
+                self.motor_timer.start()
         else:
             tk.messagebox.showinfo("Info","motor not initialized")
             
-        
+    def motor_stop_timer(self):
+        self.hcomp['motor_setting'].update_par()
+        dur = self.hcomp['motor_setting'].hcomp['dur'].get()
+        dur = float(dur)
+        if dur>0:
+            t0= self.timer.elapsed_time()
+            t=t0
+            while  self.motor_timer.running() and (t-t0)<dur*1000: #timer is millisecond 
+                sleep(0.05)
+                
+                t=self.timer.elapsed_time()
+                logging.debug('et:{}'.format(t-t0))
+            if (t-t0)>dur*1000: # when entire duration pass, stop    
+                self.motor_stop()
+            
+            
         
     def motor_stop(self):
         if self.stepper:
-            self.motor_time.append(self.daq.timer.elapsed_time())
+            self.motor_time.append(self.timer.elapsed_time())
             self.stepper.setVelocityLimit(0)
             #self.stepper.setAcceleration(0)
             self.stepper.setEngaged(False)                        
             self.hcomp['motor_setting'].entry_enable()
+        if self.motor_timer and self.motor_timer.running():
+            self.motor_timer.stop()  
+            
+            
+            
+            
             
                 
     
@@ -402,11 +435,14 @@ class Controlframe:
         motor_delay = float(self.hcomp['elec'].hcomp['motor_delay'].get())
         if ch in channels  and self.dio:        
             sleep(delay)  
-            self.elec_time.append(self.daq.timer.elapsed_time())   
+            self.elec_time.append(self.timer.elapsed_time())   
             self.elec_time.append(dur_sec)   
-            self.dio.write_outputvalue(ch, 1)            
-            sleep(dur_sec)
-            self.dio.write_outputvalue(ch, 0)
+            for i in range(5):
+                self.dio.write_outputvalue(ch, 1)                            
+                sleep(dur_sec)
+                self.dio.write_outputvalue(ch, 0)
+        
+            
         else:
             msg = "ch"+str(ch)+" not opened or device not attached"
             tk.messagebox.showinfo("Info",msg)
@@ -451,5 +487,4 @@ if __name__=='__main__':
         
 #fn = '../motor_data/152804.csv'
 #pdat = pd.read_csv(fn)
-
-
+# spd:66, accel:250 works but not very long

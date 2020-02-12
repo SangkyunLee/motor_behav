@@ -110,7 +110,7 @@ class MCC118(DAQ):
         
         nch  = len(self.ai_ch) 
                 
-        self.reset_timer()    
+        #self.reset_timer()    
         scan_status = self.hat.a_in_scan_status()    
         while self.worker.running() & scan_status.running : 
             
